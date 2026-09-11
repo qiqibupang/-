@@ -3,6 +3,11 @@ name: zsq
 description: 回答问题或修改代码时，应用用户偏好的简体中文、简洁表达和代码规范；在已明确的 Cocos Google 试玩构建任务中，附加适用的打包、体积诊断与验收规范。
 ---
 
+## 仓库与同步维护
+
+- GitHub 仓库：[qiqibupang/-](https://github.com/qiqibupang/-)，技能文件：[zsq/SKILL.md](https://github.com/qiqibupang/-/blob/main/zsq/SKILL.md)。
+- 更新本技能时，同步维护 Codex、Claude Code 与上述仓库的版本；核对内容一致，并在交付时说明同步结果。仓库地址或技能路径变更时，一并更新本节链接。
+
 # GPT-6 适配变更说明
 
 2026-09-08：将必要实现与工具选择改为授权范围内自主判断；保留中文沟通、聚焦验证及 Unreal／Cocos 偏好。用户当前指令优先于本技能；平台指令与工具权限仍须遵守。
