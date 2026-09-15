@@ -1,6 +1,6 @@
 ---
 name: zsq
-description: 回答问题或修改代码时，应用用户偏好的简体中文、简洁表达和代码规范。设计、描述、修改或评审 UE 蓝图时，按「Unreal 蓝图习惯」章节决定接口、函数、事件、组件、时间轴、定时器的选用和命名。用户提到构建、打包、出包、压缩包体时，先判断是否 Cocos 项目并确认是否试玩广告任务与打包名称，确认后附加 Google 试玩的打包、体积诊断与验收规范。
+description: 回答问题或修改代码时，应用用户偏好的简体中文、简洁表达和代码规范。涉及 UE 项目时，按「Unreal C++ 与蓝图协作」章节分层：AI 写 C++ 父类与插件，蓝图只做继承、配置和表现。用户提到构建、打包、出包、压缩包体时，先判断是否 Cocos 项目并确认是否试玩广告任务与打包名称，确认后附加 Google 试玩的打包、体积诊断与验收规范。
 ---
 
 ## 仓库与同步维护
@@ -35,88 +35,63 @@ description: 回答问题或修改代码时，应用用户偏好的简体中文�
 
 - 优先简单、直观、易维护的架构，不为边缘情况加复杂封装。
 - 沿用项目现有写法，改动范围保持小，不做无关重构；完成需求必需的函数、变量、注释可自行添加，影响较大的选择简要说明理由。
-- Unreal C++ 遍历数组默认下标写法 `for (int32 Index = 0; Index < Array.Num(); ++Index)`，项目约定不同时按项目。
-- Unreal 项目中 C++ 负责核心逻辑和数据，蓝图负责派生、配置和流程编排；变量优先定义在 C++ 父类。
-- Unreal C++ 的 `UPROPERTY`、`UFUNCTION` 默认不加 `Category`，除非用户要求。
+- Unreal 相关按下方「Unreal C++ 与蓝图协作」。
 
-# Unreal 蓝图习惯
+# Unreal C++ 与蓝图协作
 
-设计、描述、修改或评审 UE 蓝图时启用本章；用户当前要求优先。本章只管蓝图；C++ 相关仍按上方「代码习惯」。
+涉及 UE 项目的设计、写代码、评审时启用本章；用户当前要求优先。默认项目是 C++ 项目、逻辑封装在 `Plugins/<插件>/Source/` 下的 Runtime 模块，蓝图只做继承、配置和表现。AI 负责 C++，不产出蓝图节点图；蓝图侧只给"要建哪些子类、填哪些值、在哪个事件里连表现"的一两句说明。
 
-## 拆分思路
+## 分层原则
 
-- 一个玩法就是一套能直接拖进关卡的积木，按目录自成一体。先拆成三类 Actor：**生成器**（负责摆放、批量生成、持有数组）、**单体**（自己的表现和响应）、**管理器或组件**（跨对象规则）。不把整套逻辑塞进一个蓝图，也不做全局状态机。
-- GameMode、PlayerController 只放输入和必须全局协调的事情，平时接近空白。流程编排靠关卡序列在指定帧调用各 Actor 的自定义事件，不用 LevelScript。
-- 跨对象复用的规则做成 ActorComponent 挂到需要的 Actor 上；组件内缓存一次 Owner 引用，用函数取所需数据。
-- 变体用子类蓝图，只改网格、材质、默认值，事件里调父类实现。不把同名蓝图复制到别的目录各改一版：公共行为留在原蓝图，玩法差异用 `_Child` 子类或暴露变量；确实要分叉就改名，不留同名副本。
-- 多个蓝图之间要传同一组参数（如发射用的特效、缩放、速度、生命周期、数量）时，打包成一个结构体 `ST_xx配置`，只传一个结构体引脚；需要多套配置再升级成 PrimaryDataAsset。不在每个蓝图里各复制一份散变量。
-- 环境（灯光、雾、后处理）也打包成一个 Actor 积木放进每张关卡。
+- **C++ 放**：变量和数据结构、生成与批量逻辑、数组与格位管理、定时器、样条与曲线运动的计算、对象池、伤害与收集等规则、状态机、接口定义、GameplayTag 判定。判断标准：改完能用编译器、日志或自动化测试判对错的放 C++。
+- **蓝图放**：网格、材质、特效、音效、UI 资源指定；时间轴驱动的表现（闪白、缩放、抛物弧的视觉）；关卡里的摆放和参数微调；数据资产填值。判断标准：必须看着屏幕反复调的放蓝图。
+- 变量一律定义在 C++ 父类，蓝图不新建变量；蓝图里出现需要跨对象读取的状态，就是该搬进 C++ 的信号。C++ 不反向依赖蓝图（不 `FindFunction`、不 `LoadClass` 硬编码蓝图路径），确需引用蓝图类时用 `TSubclassOf<>` 或 `TSoftClassPtr<>` 暴露成属性让蓝图或数据资产填。
 
-## 函数、事件、宏怎么选
+## 类的拆分
 
-- **函数（F_）**：一个可命名的步骤就是一个函数，粒度偏细（索引转行列、行列是否有效、寻找空位、设置材质）。纯计算和查询勾 Pure，返回值用中文直接说明结果（有效、是否找到、返回向量）。复杂逻辑拆成函数，不用折叠图。
-- **自定义事件（CE_）**：被外部点名调用的行为入口，或带延迟、时间轴、定时器的异步流程。命名成对出现：开始/停止、生成/销毁、开启/关闭、取用/回归。
-- **宏库**：只放通用流程控制（带延迟的循环、可中断循环、规则阵列坐标生成）。
-- **函数库**：放跨蓝图的工具（动态材质创建与参数设置、随机点、标签比较、曲线计算）。
-- Sequence 节点分段，Is Valid 开头判空，DoOnce 做一次性初始化；Gate、FlipFlop、MultiGate 很少用。
+- 一个玩法拆成三类基类：**生成器**（`ASpawnerBase`：摆放、批量生成、持有实例数组、格位查询）、**单体**（自身状态与响应）、**管理器或组件**（跨对象规则用 `UActorComponent`，全局唯一的用 `UWorldSubsystem` / `UGameInstanceSubsystem`）。不把整套逻辑塞进一个类，也不做全局状态机。
+- GameMode、PlayerController 只放输入和必须全局协调的事。关卡流程由关卡序列或管理器驱动，不用 LevelScript。
+- 变体靠蓝图子类改资源和默认值；行为差异大到要写代码时才建 C++ 子类。
+- 可复用的发射物、掉落物用对象池组件：预生成、"正在使用"标记、取用/回归；消失优先隐藏 + 关碰撞，不销毁。
 
-## 对象间通信
+## 暴露给蓝图的方式
 
-- **接口优先于 Cast**：任何"被打、被通知、被收集"的响应都通过接口函数实现，调用方发 Message 不关心对方是谁。Cast 基本只用于取控件或已知类型的子对象。
-- 接口按职责域划分，一个域一个接口（例如：伤害交互、收集与运输、生命周期通知、动画通知），每个接口函数不超过五六个，一个 Actor 只实现自己用到的域。新需求先看属于哪个域，没有合适的再建新接口；不做"什么都往里塞"的杂项接口，避免所有实现者被迫带一堆空函数。
-- **GameplayTag 表达阵营、类型、状态**，用数据表集中定义层级标签，靠"提取/比较子标签"函数和 Switch on Gameplay Tag 分流；**枚举**只用于单个蓝图内部的模式开关。
-- 引用来源：生成时保存、碰撞事件的 Other Actor、或暴露给关卡实例手动指定的 Actor 引用变量。不用 GetAllActorsOfClass 之类的全局查找。
-- 暴露给关卡手动指定的引用，在 BeginPlay 用 Is Valid 检查一次，缺失时用 3D 数字控件或 TextRender 显示"缺引用"，不静默跳过。
-- 触发源以组件的 Begin/End Overlap 为主，Hit 只用于物理碰撞表现。
-- 事件分发器基本不用；需要回调时用接口 Message 或直接保存引用调对方事件。
-- 动画通知蓝图通过接口把开始/结束事件传给 Mesh 的 Owner。AI 用 StateTree（评估器找目标、条件判距离、任务执行），不用行为树。
+- 配置项 `UPROPERTY(EditAnywhere, BlueprintReadWrite)`；只在类默认值里改的用 `EditDefaultsOnly`，只在关卡实例改的用 `EditInstanceOnly`；运行时状态 `VisibleAnywhere, BlueprintReadOnly`；生成时要传入的加 `ExposeOnSpawn`，配合 `SpawnActorDeferred` 在 `FinishSpawning` 前赋值。
+- 组件在构造函数里 `CreateDefaultSubobject`，标 `VisibleAnywhere, BlueprintReadOnly`，命名按用途（`HitBox`、`DetectRange`、`MeshComp`），根组件用 `SceneRoot`。
+- 逻辑函数 `BlueprintCallable`，纯查询 `BlueprintPure`（`const`）。
+- 表现钩子用 `BlueprintImplementableEvent`（C++ 无实现）或 `BlueprintNativeEvent`（C++ 有默认实现，蓝图可覆盖并可调父类）。钩子命名 `On动词`，成对出现：`OnLaunched/OnStopped`、`OnAcquired/OnReleased`、`OnHit/OnDied`。C++ 在状态变化处调钩子，蓝图在钩子里连时间轴、粒子、音效。
+- 事件分发器只在确需一对多通知时用 `DECLARE_DYNAMIC_MULTICAST_DELEGATE` + `BlueprintAssignable`；点对点通知走接口。
+- `UPROPERTY`、`UFUNCTION` 默认不加 `Category`、不加 `meta=(DisplayName)`，除非用户要求。
 
-## 运动与表现
+## 类型与通信
 
-- 表现变化默认用**时间轴**：先存当前值、算目标值，一条 0→1 的 float 轨道，Update 里 Lerp 后设置位置/缩放/旋转，用 Play Rate = 1/时长控制时间，Finished 里做销毁、附加、通知、回收。抛物线用位置 Lerp 叠加单独的高度曲线。闪白、震动、波浪等各自独立时间轴。
-- 时间轴留给数量少的主角物件。几十上百个同类单体不各自挂时间轴，改由管理器用一个时间轴加数组遍历统一驱动，或用材质参数、VAT 做表现。
-- **Tick** 只用于真正连续的事情（跟随、朝向摄像机、沿样条持续移动），并且前面放布尔门。
-- **周期逻辑**用 Set Timer by Event 配自定义事件，句柄存变量，停止时 Clear and Invalidate。间隔运行中不会变的用 Looping；间隔需要动态调整的用非循环定时器，每次触发后按当前变量重新 Set Timer，或改用带延迟的循环宏每轮读一次间隔。Delay 只做一次性等待，RetriggerableDelay 做防抖。
-- 样条移动维护"沿样条距离"变量按速度累加，取位置和旋转，超长后停止或回调。曲线运动用组件或函数库里的贝塞尔、抛物线、环绕。
-- 物理只用于破坏表现：几何集合 + 力场触发，SetSimulatePhysics 后 AddImpulse。力场用一个精简的自定义力场 Actor（只保留需要的力场节点和一个触发事件）各处共用，不复制引擎示例母版。抛物线炮弹用 SuggestProjectileVelocity 算初速度。
-- 材质反馈（闪白、溶解、变色）走函数库封装的动态材质实例 + 参数设置。
-- 修正角色整体明暗时优先派生材质实例并调整现有颜色参数，保留色相、纹理和原材质；不要把多个角色统一替换成纯色材质。批量修改骨骼网格体前排除用户指定的默认角色，并保留可恢复的原资产备份。
-- 可复用物消失优先隐藏 + 关碰撞而不是销毁；真正销毁时在 Destroyed 事件里通知接口。
+- 结构体 `USTRUCT(BlueprintType)` 定义在 C++，成员 `UPROPERTY(EditAnywhere, BlueprintReadWrite)`；多个类共用的一组参数（如发射配置）打包成一个结构体传，不散成多个变量。需要多套配置时升级为 `UPrimaryDataAsset` 子类，蓝图侧建 `DA_` 资产填值。
+- 枚举 `UENUM(BlueprintType) enum class : uint8`，只用于单个类内部的模式开关；阵营、类型、状态跨对象表达用 `FGameplayTag`，标签集中定义在数据表或 `UGameplayTagsManager` 原生注册，按层级用 `MatchesTag` / `HasTag` 判定。
+- 对象间响应用接口：`UINTERFACE(Blueprintable)`，函数标 `BlueprintNativeEvent`，调用方用 `IXxx::Execute_Func(Target, ...)`，先 `Target->Implements<UXxx>()` 判定；不 `Cast<IXxx>`（蓝图实现者会拿到空）。接口按职责域拆（伤害交互、收集运输、生命周期通知），每个不超过五六个函数。
+- 引用来源：生成时保存、碰撞事件的 `OtherActor`、`EditInstanceOnly` 让关卡手填。不用 `GetAllActorsOfClass`。手填引用在 `BeginPlay` 判空并 `UE_LOG` Warning，不静默跳过。
+- 触发源以组件的 `OnComponentBeginOverlap/EndOverlap` 为主，`OnComponentHit` 只用于物理表现。
 
-## 生成与批量
+## 运行时行为
 
-- SpawnActor 需要传的参数设为 Instance Editable + Expose on Spawn，在 Spawn 节点引脚上直接填，不在生成后再 Cast 去设。
-- 生成器在构造脚本里用 Child Actor 或 InstancedStaticMesh 只做编辑器预览，参数固定为行/列/层数和对应间距、生成数量；运行时统一 Spawn 并存进数组，预览物在 BeginPlay 销毁或隐藏。不把 Child Actor 当运行时实体用。
-- 运行时生成器自行维护已生成对象数组；统计存活数、检查间距前先清理无效引用，不用 `GetAllActorsOfClass` 反复扫描全场。高频索敌用范围组件维护候选数组，或用低频 Timer 刷新范围缓存；Tick 只从缓存中做连续瞄准等必要计算。
-- 生成物 Attach 到生成器或阵列上，用相对变换数组记格位，"寻找空位"函数返回是否找到和索引。
-- 批量带间隔用 Set Timer + 序号变量，或宏库的带延迟循环，不用 Tick 计数。
-- 同类静态物大量出现时用 InstancedStaticMesh。需要复用的发射物做对象池组件：预生成、"正在使用"标记、轮询序号、取用/回归事件。
+- 周期逻辑用 `FTimerHandle` + `SetTimer`，间隔固定的 `bLoop=true`，间隔可变的非循环、回调末尾按当前值重设；`EndPlay` 里 `ClearTimer`。Tick 只用于真正连续的事（跟随、沿样条移动），默认 `PrimaryActorTick.bCanEverTick=false`，需要时按状态 `SetActorTickEnabled`。
+- 大量同类单体的动画不各自跑时间轴：由管理器统一插值、或 `UInstancedStaticMeshComponent` 加材质参数、或 VAT。时间轴留给数量少的主角物件，放蓝图。
+- 样条移动维护"沿样条距离"按速度累加，`GetLocationAtDistanceAlongSpline` 取位置和旋转；曲线运动（贝塞尔、抛物线、环绕）封装成 `UFUNCTION(BlueprintPure)` 静态函数放函数库 `UBlueprintFunctionLibrary` 子类。
+- 材质反馈用 `UMaterialInstanceDynamic`，在 `BeginPlay` 创建一次缓存，钩子里改参数。
+- 物理只用于破坏表现，几何集合 + 精简的自定义力场 Actor，不复制引擎示例。
+- 生命周期：重写 `BeginPlay` / `EndPlay` / `OnConstruction` 必调 `Super::`；预览用 `OnConstruction` 里的 Child Actor 或 ISM，运行时统一 Spawn 存数组，预览物在 `BeginPlay` 销毁或隐藏。
 
 ## 命名
 
-- 资产前缀 + 中文，前缀由资产类型决定而不是由用途决定：Actor `BP_`、ActorComponent `AC_`、接口 `BI_xx接口`、函数库 `BFL_`、宏库 `BML_`、枚举 `E_`、结构体 `ST_`、控件 `WBP_`、力场 `FS_`、几何集合 `GC_`、状态树 `STT_/STE_/STC_`、动画通知 `AN_/ANS_`、数据资产 `DA_`、子类 `_Child`。组件和控件不用 `BP_`，结构体不用 `F_`。
-- 函数 `F_动词短语`，自定义事件 `CE_动词短语`，时间轴 `用途+时间轴`，定时器句柄 `用途+定时器`，数组 `内容+数组`。名字里不带空格；Cast 结果统一 `AsXX`。
-- 变量全中文陈述式：布尔写成状态（可以改变、正在攻击、已收集、有敌人、命中？），引用写目标对象（目标Actor、目标阵列），索引写 `xxindex`/`xx序号`，位置写 当前/目标/初始/相对位置。只有引擎类名、GTag、UI、VAT、index、Actor 这类术语保留英文。不用 bIs/bHas 前缀和英文驼峰。
-- 组件命名按用途中文（受伤盒子、检测范围、数字UI、网格模型），根组件保留 DefaultSceneRoot。
-- 事件、资产建完立刻命名，不留 CustomEvent_0、NewBlueprint、NewMaterial 之类默认名；临时测试资产放统一的"测试"目录，做完删。
-- 注释框标题是短中文动宾短语，只标区块用途，不写原理。变量分类基本留默认。
-- 调试不用 PrintString，用布尔开关 + 3D 数字控件或 TextRender 显示状态。变量默认值填好并 Instance Editable，让关卡实例可直接调。
+- C++ 类按引擎前缀：`A` Actor、`U` 对象/组件、`F` 结构体、`E` 枚举、`I` 接口；成员和函数英文 PascalCase，布尔 `bXxx`，数组复数或 `XxxArray`。
+- 蓝图侧资产：`BP_`、`AC_`、`WBP_`、`DA_`、`E_`、`ST_`、`BI_` + 中文，子类 `_Child`；蓝图子类名和 C++ 父类一一对应（`ABulletBase` → `BP_子弹`）。这是给用户和组内蓝图使用者看的，C++ 里不出现中文标识符。
+- 数组遍历 `for (int32 Index = 0; Index < Array.Num(); ++Index)`；项目约定不同时按项目。
 
-## UMG
+## 发布与迭代
 
-- 只做世界空间的数字和血条控件，挂在 Actor 的 WidgetComponent 上；Actor 在 BeginPlay 取一次 GetWidget 并 Cast 存为变量。数字控件提供带枚举（加/减/不变）的变化事件，血条用双条追赶。
-- 数值只在变化的地方调控件的变化事件，不用 Tick 每帧把变量塞给控件；缓冲、追赶之类的动画由控件内部自己做。
-- 飘字、淡入淡出、位移和缩放使用 `WidgetAnimation`，在创建或初始化后只调用一次 `PlayAnimation`；不要在 Tick 中累计时间、重复设置表现值或调用 `StopAnimation`。动画结束后的销毁用动画完成事件、定时器或 Actor 生命周期处理。
-
-## 输出蓝图方案时
-
-1. 资产清单：目录、蓝图名（按前缀）、父类、组件（中文名 + 类型）。
-2. 变量表：中文名、类型、默认值、是否 Instance Editable / Expose on Spawn、用途。
-3. 逐个事件和函数：触发来源 → 节点顺序（节点名 + 关键引脚值，一行一步） → 收尾（销毁/通知/回收/清定时器）。
-4. 通信关系：谁实现哪个接口、谁在何时 Message 谁、用到哪些 GTag。
-5. 时间轴清单：名字、轨道、时长、Update 与 Finished 做什么。
-6. 需要时补关卡序列触发点。
-7. 不讨论节点摆放；不用英文变量名；不主动引入事件分发器、GameInstance、行为树、C++。只有某个函数库函数被上百个实例每帧调用且明显卡顿时，才考虑把那一个函数下沉到 C++。
+- 逻辑封装为插件：`.uplugin` 里模块 `Type="Runtime"`、`LoadingPhase="Default"`，编辑器工具单独 `Type="Editor"` 模块；`EngineVersion` 写死当前版本；示例资源放插件自己的 `Content/`。
+- 给纯蓝图用户的发行版用 `RunUAT.bat BuildPlugin -Plugin=... -Package=... -TargetPlatforms=Win64 -Rocket` 产出，附 Binaries，不要求对方装 VS。开发在含 Source 的项目里进行，Live Coding 验证。
+- 已发布的 `UPROPERTY` 只加不删；改名必须在 `DefaultEngine.ini` 加 `CoreRedirects`；改父类结构后提醒用户检查已有蓝图子类。
+- 交付时列：新增/修改的类与文件、暴露给蓝图的属性和钩子、蓝图侧需要做的操作（建哪个子类、填哪些值、在哪个事件里连表现）、编译结果。
 
 # 试玩广告任务
 
@@ -169,6 +144,7 @@ description: 回答问题或修改代码时，应用用户偏好的简体中文�
 
 # 变更记录
 
+- 2026-09-15：用「Unreal C++ 与蓝图协作」整章替换同日新增的「Unreal 蓝图习惯」：用户不再让 AI 写蓝图，改为 AI 写 C++ 父类并封装插件，蓝图只做继承、配置、表现。原蓝图习惯里的拆分思路、接口优先、GameplayTag、对象池、定时器、命名口味吸收进 C++ 侧规则；新增暴露方式、类型与通信、发布与迭代（BuildPlugin、CoreRedirects）。「代码习惯」里三条 Unreal 规则并入本章。
 - 2026-09-15：补充 UMG 动画一次触发、范围候选缓存、生成器自管数组与材质实例提亮规范；GitHub 同步改为仅在用户明确要求时执行。
 - 2026-09-15：新增「Unreal 蓝图习惯」一章（拆分思路、函数/事件/宏选用、接口与 GameplayTag 通信、时间轴与定时器、生成与批量、命名、UMG、输出格式），替换原「Unreal 蓝图逻辑风格」小节；触发条件放宽为"设计、描述、修改或评审 UE 蓝图时"。对旧习惯的改进（按职责域拆接口、参数打包结构体、不留同名副本、精简力场、Child Actor 只做预览、控件按变化更新、大量单体由管理器驱动、可调间隔用非循环定时器、不留默认名、前缀与 Cast 命名统一、暴露引用做缺失提示）直接写成规则，不单列短板表。独立的 `ue-blueprint-style` skill 已并入本文件。
 - 2026-09-11：新增「触发判断」：用户提到构建/打包时先判断是否 Cocos 项目，是则一次性询问"是否试玩任务 + 打包名称"再开工，确认后启用本章。
