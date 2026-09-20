@@ -41,6 +41,16 @@ description: 回答问题或修改代码时，应用用户偏好的简体中文�
 
 涉及 UE 项目的设计、写代码、评审时启用本章；用户当前要求优先。默认项目是 C++ 项目、逻辑封装在 `Plugins/<插件>/Source/` 下的 Runtime 模块。目标是让用户高效迭代：AI 负责 C++ 规则和引擎原生系统之间的胶水，用户在编辑器里做资产、蓝图子类、表现和调参；两边并行，每轮都是一个能在 PIE 里立刻看到的小增量。
 
+## UE 项目默认接入 UE-MCP
+
+- 用户已指定：后续 UE 项目默认接入第三方 **db-lyon/ue-mcp**，编辑器操作优先使用这套 MCP；不要把名称相似的其他 Unreal MCP 项目当成同一个工具。
+- 官方网站与下载入口（用户指定）：[https://ue-mcp.com/](https://ue-mcp.com/)。
+- 补充来源：仓库与源码下载 [https://github.com/db-lyon/ue-mcp](https://github.com/db-lyon/ue-mcp)；发行版本：[Releases](https://github.com/db-lyon/ue-mcp/releases)；npm 包：[ue-mcp](https://www.npmjs.com/package/ue-mcp)。工程内的桥接插件名为 `UE_MCP_Bridge`。
+- 开始 UE 项目工作时先检查已有连接及其 `.uproject` 目标。已接入就复用；未接入时，按仓库当前说明和项目引擎版本完成接入，无需重复询问是否使用此 MCP。常规入口是在项目目录运行 `npx ue-mcp init`；MCP 服务启动参数指向当前项目的 `.uproject`，不沿用其他工程的路径或端口。接入前保留已有配置，避免覆盖其他 MCP 服务。
+- 接入后用 `project(action="get_status")` 确认连接的是当前工程，按需用 `catalog` 查询动作参数。工具前缀可能随客户端配置变化，不固定为某一个 UE 版本名。
+- UE 5.8 及以上可通过这套 MCP 的 `epic_*` 动作调用 Epic 官方工具；第三方桥接和官方工具可以配合使用。C++ 文件修改与 UBT 编译仍按实际需要使用本地文件和命令行工具。
+- 已正常工作的安装不因日常任务自动升级；需要升级时参考仓库的 `npx ue-mcp update` 流程，并核对服务端、桥接插件与引擎兼容性。接入偏好不改变用户对资产修改、游戏运行或测试的限制。
+
 ## 原生优先
 
 - 先找 UE 官方原生系统，能用原生就不自己写：粒子、碎块、拖尾用 Niagara；物理破坏用 Chaos 几何集合；输入用 Enhanced Input；配置用 DataTable / `UPrimaryDataAsset`；UI 用 UMG；少量主角物件的时间轴表现用 Timeline / Curve；动画事件用 AnimNotify；材质反馈用材质参数 + MID；音效用 MetaSound / SoundCue；相机用 CameraShake / SpringArm；AI 用行为树 / StateTree；保存用 SaveGame。
