@@ -127,10 +127,10 @@ description: 图片或视频生成、改图、重生成前，先询问并确认�
 
 ## 类的拆分
 
-- 一个玩法拆成三类基类：**生成器**（`ASpawnerBase`：摆放、批量生成、持有实例数组、格位查询）、**单体**（自身状态与响应）、**管理器或组件**（跨对象规则用 `UActorComponent`，全局唯一的用 `UWorldSubsystem` / `UGameInstanceSubsystem`）。不把整套逻辑塞进一个类，也不做全局状态机。
-- GameMode、PlayerController 只放输入和必须全局协调的事。关卡流程由关卡序列或管理器驱动，不用 LevelScript。
+- 按职责、复用需求和生命周期决定类的拆分，优先沿用项目现有架构。小功能可由一个 Actor 或组件完成；需要批量生成时增加生成器，需要跨对象协调时再增加管理器。可复用的对象能力用 `UActorComponent`，世界级或跨关卡服务分别考虑 `UWorldSubsystem` / `UGameInstanceSubsystem`；不因只有一个实例就建立 Subsystem，也不为凑齐三类增加空壳。状态机仅在状态与转换确实复杂时引入，放在负责该流程的对象中。
+- 遵循 UE 原生职责：GameMode 管理权威游戏规则，PlayerController 管理玩家控制与输入协调；联网共享状态按需放在 GameState / PlayerState。关卡流程沿用项目已有承载方式，可复用逻辑放专用 Actor、组件或管理器；LevelScript 可用于少量仅属于当前关卡的编排，不承担跨关卡通用系统。
 - 变体靠蓝图子类改资源和默认值；行为差异大到要写代码时才建 C++ 子类。
-- 可复用的发射物、掉落物用对象池组件：预生成、"正在使用"标记、取用/回归；消失优先隐藏 + 关碰撞，不销毁。
+- 发射物、掉落物在高频生成销毁或性能证据表明有收益时使用对象池；数量少、生命周期简单时直接 Spawn / Destroy。使用对象池时明确取用和回收入口，完整重置碰撞、物理速度、计时器、事件订阅及单体状态，避免只隐藏对象造成状态残留。
 
 ## 暴露给蓝图的方式
 
@@ -138,7 +138,7 @@ description: 图片或视频生成、改图、重生成前，先询问并确认�
 - 组件在构造函数里 `CreateDefaultSubobject`，标 `VisibleAnywhere, BlueprintReadOnly`，命名按用途（`HitBox`、`DetectRange`、`MeshComp`），根组件用 `SceneRoot`。
 - 逻辑函数 `BlueprintCallable`，纯查询 `BlueprintPure`（`const`）。
 - 表现钩子用 `BlueprintImplementableEvent`（C++ 无实现）或 `BlueprintNativeEvent`（C++ 有默认实现，蓝图可覆盖并可调父类）。钩子命名 `On动词`，成对出现：`OnLaunched/OnStopped`、`OnAcquired/OnReleased`、`OnHit/OnDied`。C++ 在状态变化处调钩子，蓝图在钩子里连时间轴、粒子、音效。
-- 事件分发器只在确需一对多通知时用 `DECLARE_DYNAMIC_MULTICAST_DELEGATE` + `BlueprintAssignable`；点对点通知走接口。
+- 一对多且需要蓝图绑定的通知用 `DECLARE_DYNAMIC_MULTICAST_DELEGATE` + `BlueprintAssignable`；点对点调用在已知类型、依赖合理时直接调用，多个不同类型需要共享能力契约时再用接口。
 - 暴露到编辑器或蓝图的 `UPROPERTY` 必须用 `DisplayName` 显示中文，不设置 `Category`；常用配置用较小且连续的 `DisplayPriority` 靠前显示，运行时状态排后。
 - 暴露到蓝图的 `UFUNCTION` 必须设置中文 `DisplayName`，并按蓝图节点类型添加前缀：普通函数和纯函数使用 `F_中文名`，自定义事件使用 `CE_中文名`。以蓝图中的实际节点形态为准；带返回值的 `BlueprintNativeEvent` 属于函数，使用 `F_`。C++ 函数名仍使用英文 PascalCase。
 
@@ -160,10 +160,10 @@ description: 图片或视频生成、改图、重生成前，先询问并确认�
 ## 类型与通信
 
 - 结构体 `USTRUCT(BlueprintType)` 定义在 C++，成员 `UPROPERTY(EditAnywhere, BlueprintReadWrite)`；多个类共用的一组参数（如发射配置）打包成一个结构体传，不散成多个变量。需要多套配置时升级为 `UPrimaryDataAsset` 子类，蓝图侧建 `DA_` 资产填值。
-- 枚举 `UENUM(BlueprintType) enum class : uint8`，只用于单个类内部的模式开关；阵营、类型、状态跨对象表达用 `FGameplayTag`，标签集中定义在数据表或 `UGameplayTagsManager` 原生注册，按层级用 `MatchesTag` / `HasTag` 判定。
-- 对象间响应用接口：`UINTERFACE(Blueprintable)`，函数标 `BlueprintNativeEvent`，调用方用 `IXxx::Execute_Func(Target, ...)`，先 `Target->Implements<UXxx>()` 判定；不 `Cast<IXxx>`（蓝图实现者会拿到空）。接口按职责域拆（伤害交互、收集运输、生命周期通知），每个不超过五六个函数。
+- 固定、互斥且集合稳定的类型或模式用枚举；需要蓝图使用时声明 `UENUM(BlueprintType) enum class : uint8`，可供多个类共享。需要可扩展分类、多标签组合或层级匹配时用 `FGameplayTag`；标签集中定义在数据表或原生注册，层级判断用 `MatchesTag` / `HasTag`。不只因跨对象使用就把枚举改为标签。
+- 多种对象需要共享交互能力、且不宜依赖具体类型时定义接口，按伤害、收集、生命周期等职责保持契约内聚，不设固定函数数量。需要蓝图实现时使用 `UINTERFACE(Blueprintable)` 和合适的蓝图事件；`BlueprintNativeEvent` 提供 C++ 默认实现。调用先检查 `Target->Implements<UXxx>()`，再用 `IXxx::Execute_Func(Target, ...)`；不能依靠 `Cast<IXxx>` 检测仅在蓝图中实现的接口。
 - 引用来源：生成时保存、碰撞事件的 `OtherActor`、`EditInstanceOnly` 让关卡手填。不用 `GetAllActorsOfClass`。手填引用在 `BeginPlay` 判空并 `UE_LOG` Warning，不静默跳过。
-- 触发源以组件的 `OnComponentBeginOverlap/EndOverlap` 为主，`OnComponentHit` 只用于物理表现。
+- 根据交互语义选择事件：进入、离开检测区域用 `OnComponentBeginOverlap/EndOverlap`；阻挡碰撞、撞击伤害或需要碰撞结果时用 `OnComponentHit`，并配置对应的碰撞响应和事件开关。
 
 ## 运行时行为
 
@@ -171,7 +171,7 @@ description: 图片或视频生成、改图、重生成前，先询问并确认�
 - 大量同类单体的动画不各自跑时间轴：由管理器统一插值、或 `UInstancedStaticMeshComponent` 加材质参数、或 VAT。时间轴留给数量少的主角物件，放蓝图。
 - 样条移动维护"沿样条距离"按速度累加，`GetLocationAtDistanceAlongSpline` 取位置和旋转；曲线运动（贝塞尔、抛物线、环绕）封装成 `UFUNCTION(BlueprintPure)` 静态函数放函数库 `UBlueprintFunctionLibrary` 子类。
 - 材质反馈用 `UMaterialInstanceDynamic`，在 `BeginPlay` 创建一次缓存，钩子里改参数。
-- 物理只用于破坏表现，用 Chaos 几何集合 + 精简的自定义力场 Actor，不复制引擎示例；碎块、飞溅等表现走 Niagara，C++ 只负责 `SpawnSystemAtLocation` 和设置 `User.` 参数。
+- 需要真实受力、堆叠、碰撞或约束的玩法优先使用 UE 原生物理；需要精确轨迹或规则控制时选择运动组件或显式移动，按玩法需求决定。可交互破坏使用 Chaos 几何集合，纯视觉碎屑、飞溅优先 Niagara；C++ 负责玩法规则与原生系统的参数、事件连接，不另写重复的物理或粒子系统。
 - 生命周期：重写 `BeginPlay` / `EndPlay` / `OnConstruction` 必调 `Super::`；预览用 `OnConstruction` 里的 Child Actor 或 ISM，运行时统一 Spawn 存数组，预览物在 `BeginPlay` 销毁或隐藏。
 
 ## 命名
