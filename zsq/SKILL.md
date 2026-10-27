@@ -163,6 +163,7 @@ description: 图片或视频生成、改图、重生成前，先询问并确认�
 - 一对多且需要蓝图绑定的通知用 `DECLARE_DYNAMIC_MULTICAST_DELEGATE` + `BlueprintAssignable`；点对点调用在已知类型、依赖合理时直接调用，多个不同类型需要共享能力契约时再用接口。
 - 暴露到编辑器或蓝图的 `UPROPERTY` 必须用 `DisplayName` 显示中文。每个类的自定义变量（包括组件引用、配置、运行状态和蓝图自建变量）默认统一放在一个 `Category` 中，类别名取对应派生蓝图的中文业务名，去掉 `BP_`、`ABP_` 等技术前缀，例如 `BP_子弹发射器` 对应 `Category="子弹发射器"`。不默认拆成位置、伤害、特效等多个分类，也不使用空类别或内部 C++ 类名。多个派生蓝图共用一个原生基类时，基类变量使用共同的中文业务名（例如“主角小兵”和“敌方小兵”共用“小兵”）；没有派生蓝图的组件或结构体使用自身中文名。
 - **暴露变量尽量置顶**：所有自定义暴露变量在细节面板中都尽可能靠前，不仅限于常用配置。优先用 UE 原生 `PrioritizeCategories` 将业务类别排到前面，再用较小且连续的 `DisplayPriority` 排列类内变量；需要明确先后时用 `DisplayAfter`，不要只设置变量顺序却把整个类别留在面板底部。
+- **类别排序要做最终验证**：如果 `PrioritizeCategories` 和 `DisplayPriority` 仍让业务变量落在 Transform、Rendering 等 UE 原生类别后面，不能继续堆元数据；在编辑器模块中用 `IDetailCustomization::SortCategories` 配合 `IDetailCategoryBuilder::SetSortOrder` 调整最终类别顺序，并重启/刷新编辑器后实际查看细节面板确认。只在 `WITH_EDITOR` 下依赖 `PropertyEditor`，不要把编辑器模块依赖带进运行时构建。
 - **数字变量不额外加单位**：所有自定义数字字段不添加 `Units`、`ForceUnits` 元数据，也不在显示名称中追加“秒”“厘米/秒”等单位后缀。保留 UE 原生数值及默认单位规则，不自行换算单位，不为此修改引擎原生字段或全局单位设置。
 - `UCLASS`、`UINTERFACE`、`USTRUCT`、`UENUM` 及枚举值同样用 `DisplayName` 显示中文。
 - 暴露到蓝图的 `UFUNCTION` 必须设置中文 `DisplayName`，并按蓝图节点类型添加前缀：普通函数和纯函数使用 `F_中文名`，自定义事件使用 `CE_中文名`，`BlueprintAssignable` 委托使用 `ED_中文名`。以蓝图中的实际节点形态为准：带返回值或输出参数的 `BlueprintImplementableEvent` / `BlueprintNativeEvent` 在蓝图里是可重写函数，使用 `F_`；无返回值的才是事件，使用 `CE_`。C++ 函数名仍使用英文 PascalCase。
