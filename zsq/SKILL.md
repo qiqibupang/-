@@ -165,7 +165,7 @@ description: 图片或视频生成、改图、重生成前，先询问并确认�
 - **新增命名先询问**：以后新建变量、组件、函数、事件、蓝图资产等名称时，默认先询问用户并等待命名；用户已经给出明确名称，或明确要求“不要询问我”时，直接按要求创建。已有名称的修改和内部临时标识符沿用项目命名规则处理。
 - **暴露变量尽量置顶**：所有自定义暴露变量在细节面板中都尽可能靠前，不仅限于常用配置。优先用 UE 原生 `PrioritizeCategories` 将业务类别排到前面，再用较小且连续的 `DisplayPriority` 排列类内变量；需要明确先后时用 `DisplayAfter`，不要只设置变量顺序却把整个类别留在面板底部。
 - **类别排序要做最终验证**：如果 `PrioritizeCategories` 和 `DisplayPriority` 仍让业务变量落在 Transform、Rendering 等 UE 原生类别后面，不能继续堆元数据；在编辑器模块中用 `IDetailCustomization::SortCategories` 配合 `IDetailCategoryBuilder::SetSortOrder` 调整最终类别顺序，并重启/刷新编辑器后实际查看细节面板确认。只在 `WITH_EDITOR` 下依赖 `PropertyEditor`，不要把编辑器模块依赖带进运行时构建。
-- **数字变量不额外加单位**：所有自定义数字字段不添加 `Units`、`ForceUnits` 元数据，也不在显示名称中追加“秒”“厘米/秒”等单位后缀。保留 UE 原生数值及默认单位规则，不自行换算单位，不为此修改引擎原生字段或全局单位设置。
+- **UE 变量统一使用原生标准单位，禁止换算**：编写的所有 UE 变量、默认值、蓝图输入和细节面板数值均直接使用对应 UE API 的原生单位；例如距离用 cm、移动速度用 cm/s、时间用 s、旋转角度用度，无量纲数值保持原值。移动速度应直接填写并显示 `-150`，不得改为或自动显示成 `-1.5 m/s`。自定义数字字段不添加 `Units`、`ForceUnits` 元数据，不在显示名称追加单位后缀，不引入乘除 100 等面向显示的换算，也不修改引擎原生字段或全局单位设置。交付前核对实际细节面板中的显示值和底层值一致，反射读回不能代替面板验证。
 - `UCLASS`、`UINTERFACE`、`USTRUCT`、`UENUM` 及枚举值同样用 `DisplayName` 显示中文。
 - 暴露到蓝图的 `UFUNCTION` 必须设置中文 `DisplayName`，并按蓝图节点类型添加前缀：普通函数和纯函数使用 `F_中文名`，自定义事件使用 `CE_中文名`，`BlueprintAssignable` 委托使用 `ED_中文名`。以蓝图中的实际节点形态为准：带返回值或输出参数的 `BlueprintImplementableEvent` / `BlueprintNativeEvent` 在蓝图里是可重写函数，使用 `F_`；无返回值的才是事件，使用 `CE_`。C++ 函数名仍使用英文 PascalCase。
 - 蓝图派生类需要看到父类函数时，函数必须声明为 `BlueprintCallable`（查询类函数用 `BlueprintPure`）；蓝图中只需出现可调用函数节点即可，不要求额外创建自定义事件或把事件连接到父类函数。
