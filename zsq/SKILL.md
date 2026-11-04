@@ -234,7 +234,8 @@ description: 图片或视频生成、改图、重生成前，先询问并确认�
 
 ## 发布与迭代
 
-- 逻辑封装为插件：`.uplugin` 里模块 `Type="Runtime"`、`LoadingPhase="Default"`，编辑器工具单独 `Type="Editor"` 模块；`EngineVersion` 写死当前版本；示例资源放插件自己的 `Content/`。
+- C++ 逻辑封装为插件：`.uplugin` 里模块 `Type="Runtime"`、`LoadingPhase="Default"`，编辑器工具单独 `Type="Editor"` 模块；`EngineVersion` 写死当前版本。
+- **派生蓝图放项目 Content，目录用中文**：供项目使用和编辑的派生蓝图（含 `BP_`、`ABP_`、`WBP_`）放在项目 `Content/`（`/Game/`）下，不放 `Plugins/<插件>/Content/`。新增业务文件夹使用中文，例如 `Content/玩法/蓝图`、`Content/玩法/界面`；配套可编辑曲线可放 `Content/玩法/曲线`。`Content`、`Plugins`、`Source` 等引擎固定目录名保持不变。已有蓝图需要迁移时，使用 UE 原生资产移动/重命名，修复引用与重定向器，并编译、保存、检查关卡引用，不直接在文件系统剪切 `.uasset`。
 - 给纯蓝图用户的发行版用 `RunUAT.bat BuildPlugin -Plugin=... -Package=... -TargetPlatforms=Win64 -Rocket` 产出，附 Binaries，不要求对方装 VS。开发在含 Source 的项目里进行，Live Coding 验证。
 - 已发布的 `UPROPERTY` 只加不删；改名必须在 `DefaultEngine.ini` 加 `CoreRedirects`；改父类结构后提醒用户检查已有蓝图子类。
 - 交付时列：选用的原生系统及理由（一行）、新增/修改的类与文件、暴露给蓝图的属性、编辑器操作清单（建哪个子类、填哪些值、在哪个事件里连表现）、AI 已直接改动的蓝图与节点、PIE 验证方式、编译结果与下一步（Live Coding 还是重启编辑器）。暴露的函数、事件、委托用一张表列出：C++ 名、`DisplayName`（带前缀）、节点类型（函数 / 纯函数 / 空事件 / 有默认实现的事件（需调父类） / 可重写函数 / 委托）、所属类、用途、是否已放入蓝图。另列蓝图无法重写的固定流程及钩子位置。
