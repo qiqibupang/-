@@ -48,7 +48,8 @@
 - 用户给定名称直接用；已授权自行命名时按中文业务含义确定，不重复询问。只有名称涉及未明确的业务语义时再问。
 - 函数和纯函数前缀 F_，无返回值事件 CE_，委托 ED_；带返回值的 NativeEvent / ImplementableEvent 实际是函数，仍用 F_。
 - 每个类的暴露变量统一在去除 BP_ 等前缀的中文业务 Category；共用基类用共同业务名。事件分组与变量分类分别管理。
-- 业务类别用 PrioritizeCategories 前置，类内用连续 DisplayPriority / 必要的 DisplayAfter。原生元数据不足且本轮需要修正时，在 Editor 模块用 IDetailCustomization::SortCategories 和 SetSortOrder；不强制收尾打开面板验收。
+- 所有暴露给编辑器直接调用的事件和函数（C++ CallInEditor、蓝图勾选“在编辑器中调用”的入口）统一归入“编辑器操作”分类，集中显示在详情面板最顶部、先于业务参数与 Transform 等原生分类；继承入口也遵守。不得按业务类别分散按钮，不能只靠分类名称前缀假定置顶。普通运行时事件不因此新增 CallInEditor。
+- 业务类别用 PrioritizeCategories 前置，排在“编辑器操作”之后；类内用连续 DisplayPriority / 必要的 DisplayAfter。原生元数据不足时，在 Editor 模块用 IDetailCustomization::SortCategories 和 SetSortOrder 保证最终顺序。修改时检查 C++ 与蓝图入口并做一次实际面板检查，保留原有函数名、逻辑、连线及变量分类。
 - UE 数值直接使用 API 原生单位：距离 cm、速度 cm/s、时间 s、角度为度。自定义字段不加 Units / ForceUnits，不在显示名加单位后缀，不为显示乘除 100，不改全局或引擎原生单位设置。
 - 每个协作入口用注释说明触发时机、前后固定步骤、参数和推荐用途，不用 BlueprintInternalUseOnly 隐藏给用户的接口。
 
@@ -57,7 +58,7 @@
 - 只暴露本轮实际有规则替换、表现接入或通知价值的入口，流程可按需要拆成积木函数；不为未来猜想扩展接口。积木函数校验状态，非法调用返回并给明确 Warning。
 - 可替换步骤用 BlueprintNativeEvent，名称 CE_重写_业务名 / F_重写_业务名；注释明确默认实现及“不调父类即替换，调父类保留”。
 - 仅追加效果用 BlueprintImplementableEvent，名称 CE_附加_业务名；注释明确“无默认实现，不替换固定流程，不需要调用父类，空着不影响功能”。有两种实际需求时同时提供，只适合一种时不凑双入口。
-- 分组 Category 为“业务名|可重写事件”和“业务名|附加效果事件”。固定调度承担状态校验、唯一触发、重入保护与收尾，独立调用两种入口；附加事件不能仅写在可被替换的 _Implementation 中。
+- 非编辑器直接调用的事件分组 Category 为“业务名|可重写事件”和“业务名|附加效果事件”；启用 CallInEditor 的入口遵守上面的“编辑器操作”集中置顶规则。固定调度承担状态校验、唯一触发、重入保护与收尾，独立调用两种入口；附加事件不能仅写在可被替换的 _Implementation 中。
 - 明确固定步骤、可替换步骤和顺序；蓝图 Delay / Timeline 不会让同步 C++ 自动等待。回调后按需处理销毁和状态变更，不声称附加事件完全隔离其主动副作用。
 - 优先沿用适合的原生入口；修改旧接口保持兼容，不批量重命名无关事件。已发布属性不随意删除；必要改名用 CoreRedirects。
 
