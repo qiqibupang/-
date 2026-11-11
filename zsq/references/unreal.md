@@ -50,6 +50,7 @@
 - 每个类的暴露变量统一在去除 BP_ 等前缀的中文业务 Category；共用基类用共同业务名。事件分组与变量分类分别管理。
 - 所有暴露给编辑器直接调用的事件和函数（C++ CallInEditor、蓝图勾选“在编辑器中调用”的入口）统一归入“编辑器操作”分类，集中显示在详情面板最顶部、先于业务参数与 Transform 等原生分类；继承入口也遵守。不得按业务类别分散按钮，不能只靠分类名称前缀假定置顶。普通运行时事件不因此新增 CallInEditor。
 - 业务类别用 PrioritizeCategories 前置，排在“编辑器操作”之后；类内用连续 DisplayPriority / 必要的 DisplayAfter。原生元数据不足时，在 Editor 模块用 IDetailCustomization::SortCategories 和 SetSortOrder 保证最终顺序。修改时检查 C++ 与蓝图入口并做一次实际面板检查，保留原有函数名、逻辑、连线及变量分类。
+- 蓝图自定义事件的节点 Category 不一定传递到编译生成的 UFunction（UE 5.8 存在此情况）；若按钮仍落在“默认”分类，在项目 Editor 扩展中补齐 CallInEditor 函数的显示分类并刷新详情，不修改引擎或事件逻辑。以编译后实际面板为准。
 - UE 数值直接使用 API 原生单位：距离 cm、速度 cm/s、时间 s、角度为度。自定义字段不加 Units / ForceUnits，不在显示名加单位后缀，不为显示乘除 100，不改全局或引擎原生单位设置。
 - 每个协作入口用注释说明触发时机、前后固定步骤、参数和推荐用途，不用 BlueprintInternalUseOnly 隐藏给用户的接口。
 
