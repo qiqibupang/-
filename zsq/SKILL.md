@@ -16,7 +16,7 @@ description: 应用用户的简体中文协作与代码偏好；UE 任务使用 
 | UE 实现、修复、设计、评审 | [Unreal 协作](references/unreal.md) | 完成实现、编译与保存后做简单验证；发现问题继续修复并复验 |
 | 用户指定 Blender 建模 | [Blender 成品要求](references/blender.md) | 交付符合参考风格的可编辑成品，不用简单几何拼接充当完成品 |
 | AI 图片、视频生成或编辑 | [AI 生成流程](references/ai-media.md) | 确认模型和必要生成参数；普通查看、分析、裁剪转码不触发生成流程 |
-| Cocos 脚本、预制体、构建 | [Cocos 规范](references/cocos.md) | 普通开发只用脚本规范；确认是试玩广告打包才启用渠道与体积验收 |
+| Cocos 脚本、预制体、构建 | [Cocos 规范](references/cocos.md) | 普通开发只用脚本规范；确认是试玩广告打包才启用渠道、体积及 Axon 埋点验收，并为成品加 `-已埋点` 后缀 |
 
 跨领域任务按实际子任务组合；验证仅覆盖本次改动的实际用途，不扩展到无关系统。
 

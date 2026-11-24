@@ -47,6 +47,16 @@
 - "重新构建"指实际执行 Cocos Creator 命令行构建（`CocosCreator.exe --project <项目> --build "configPath=<配置>"`，3.8 成功退出码 36）或从头跑用户的一键脚本，并核对产物 mtime 晚于本次构建开始时间；对旧 `build/` 直接跑后处理不算。交付时给出构建命令、退出码、产物时间戳。
 - 优化完成后删除或移走旧 `build/`，按用户平时的手动方式干净构建一次并测量，以此作为验收依据，不用中间产物代替。
 
+## 试玩广告埋点与成品命名
+
+每次新构建和重新构建都按 [Axon Playable Analytics 官方规范](https://support.axon.ai/en/growth/promoting-your-apps/creatives/playable-analytics-integration) 检查并接入适用事件。先确认试玩有可度量的挑战和结果。少于三次交互即可完成、首次交互后五秒内直接跳转、或只有展示而没有可判定挑战的创意，按官方适用范围记录原因。
+
+- 从玩法、加载、界面和下载按钮的真实回调调用 `window.ALPlayableAnalytics.trackEvent(eventName)`。SDK 由宿主注入。调用前检测方法存在，隔离异常，其他渠道和本地预览仍应正常运行。只发送官方预定义事件，按单次广告去重。
+- 有真实前置加载时成对上报 `LOADING`、`LOADED`。首个可交互画面显示时上报 `DISPLAYED`，首次有效玩法输入上报 `CHALLENGE_STARTED`。有实际进度时在到达 25%、50%、75% 时分别上报 `CHALLENGE_PASS_25`、`CHALLENGE_PASS_50`、`CHALLENGE_PASS_75`。
+- 挑战应有可到达的结果。失败、失败后用户真正重试、成功分别上报 `CHALLENGE_FAILED`、`CHALLENGE_RETRY`、`CHALLENGE_SOLVED`。内置结算卡实际显示时上报 `ENDCARD_SHOWN`。任一下载入口由用户点击时上报 `CTA_CLICKED`，包括结算前的常驻按钮。省略玩法不存在的可选节点及已弃用的 `COMPLETED`。
+- 在最终 HTML 或解压后的 ZIP 入口，用测试宿主记录真实流程的事件、顺序和去重，覆盖存在的胜负、重试、结算及 CTA，并验证缺少分析 SDK 时玩法和渠道跳转正常。验收记录区分接口模拟和投放后台回传。
+- 对已实装并通过埋点验收的每个地区和渠道成品，在最终文件的扩展名前统一追加一次 `-已埋点`，例如 `…-mjw-zsq-已埋点.html` 或 `…-mjw-zsq-已埋点.zip`。保留原有命名字段，重建时避免重复后缀。未接入或未验证的成品不能标记为已埋点。
+
 ## 运行与商店跳转验收
 
 - 体积达标后才进入正式运行验收（定位压缩导致的问题可做必要运行诊断）。实际运行入口 HTML 并进入关卡或可交互的游戏内容；合理启动期后仍黑屏、停在插屏、进不了游戏即失败。后续修复改变 Google 产物时重新测体积。
